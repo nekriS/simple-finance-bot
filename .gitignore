@@ -1,0 +1,13 @@
+/log
+log/
+/data
+data/
+__pycache__/
+/__pycache__
+
+login.py
+*.json
+
+*.pyc
+*.dll
+*.exe
