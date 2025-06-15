@@ -4,7 +4,7 @@ import calendar
 import numpy as np
 from telebot import types
 import datetime
-import sys
+import csv
 import os
 
 def log(text):
@@ -66,20 +66,20 @@ def add_operation(path, memory, id, num, cat):
         information["operations"][nowf] = []
 
 
-    cat_str = "None"
+    # cat_str = "None"
 
-    try:
-        if num < 0:
-            cat_str = information["categories"]["expenses"][cat]
-        elif num > 0:
-            cat_str = information["categories"]["income"][cat]
-        else:
-            pass
-    except:
-        log(f"Couldn't get the category! id: {id}, cat_id: {cat}")
-        pass
+    # try:
+    #     if num < 0:
+    #         cat_str = information["categories"]["expenses"][cat]
+    #     elif num > 0:
+    #         cat_str = information["categories"]["income"][cat]
+    #     else:
+    #         pass
+    # except:
+    #     log(f"Couldn't get the category! id: {id}, cat_id: {cat}")
+    #     pass
     
-    information["operations"][nowf].append([nowf, num, cat_str])
+    information["operations"][nowf].append([num, cat])
 
     save_data(information, path.path_json + "/" + str(id) + ".json")
 
@@ -90,6 +90,7 @@ def add_operation(path, memory, id, num, cat):
 def create_profile(path, object):
     #загружаем бд с данными пользователей
     users = load_data(path.path_users)
+    result = True
 
     if not(str(object.id) in users):
         users[str(object.id)] = {}
@@ -98,6 +99,8 @@ def create_profile(path, object):
         users[str(object.id)]["last_name"] = object.last_name
         users[str(object.id)]["username"] = object.username
         users[str(object.id)]["is_premium"] = bool(object.is_premium)
+    else:
+        result = False
 
     if not("is_pay" in users[str(object.id)]):
         users[str(object.id)]["is_pay"] = False #для примера, потом убрать, иначе будет стирать историю покупок подписки
@@ -121,12 +124,13 @@ def create_profile(path, object):
 
     save_data(inf, path.path_json + "/" + str(object.id) + ".json")
     save_data(users, path.path_users)
-    return users
+
+    return result
 
 def get_day_saldo(day_operations):
     summa = 0
     for operation in day_operations:
-        summa += operation[1]
+        summa += operation[0]
     return summa
 
 def statistic_seven_day(bot, path, memory, id):
@@ -269,3 +273,36 @@ def settings(bot, path, memory, id):
 """
     
     bot.send_message(id, text=texts, reply_markup=memory.keyboards["keyboard_setting"], parse_mode='markdown')
+
+import time
+
+def get_csv_month(bot, path, memory, id):
+
+    bot.send_message(id, text="Формируем файл CSV...")
+
+    table = [["date", "balance"]]
+    user = load_data(path.path_json + "/" + str(id) + ".json")
+
+    now = datetime.datetime.now(tz=memory.timezone)  
+
+    for day in range (0, 30):
+        date = now - datetime.timedelta(days=day)
+        date_formate = date.strftime("%d.%m.%Y")
+        
+        if date_formate in user["operations"]:
+            table.append([date.strftime("%d.%m") , round(get_day_saldo(user["operations"][date_formate]), 2)])  
+
+    print(table)
+    with open(f'data/month_{id}.csv', 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows(table)
+    
+    time.sleep(5)
+
+    bot.send_document(id, document=open(f'data/month_{id}.csv', 'rb'), caption="✅️ Файл сформирован!")
+
+    os.remove(f'data/month_{id}.csv')
+    
+    main_menu(bot, path, memory, id)
+
+    
