@@ -192,23 +192,23 @@ def main_menu(bot, path, memory, id):
     now = datetime.datetime.now(tz=memory.timezone)  
     nowf = now.strftime("%d.%m.%Y")
 
-    balance = str((user["balance"]))
+    balance = round((user["balance"]),2)
 
     sum = 0.0
     if nowf in user["operations"]:
         for el in user["operations"][nowf]:
-            sum += float(el[1])
-    sald = str(sum)
+            sum += float(el[0])
+    sald = round(sum,2)
 
     minn = 0.0
     if nowf in user["operations"]:
         for el in user["operations"][nowf]:
-            if el[1] < 0:
-                minn += float(el[1])
+            if el[0] < 0:
+                minn += float(el[0])
     
 
     daily_count = float(users[str(id)]["days_limit"]) 
-    ost = str(daily_count + minn)
+    ost = round(daily_count + minn,2)
 
 
     if users[str(id)]["days"] == 'week':
@@ -220,7 +220,7 @@ def main_menu(bot, path, memory, id):
         dn = str(dayss+1 - int(now.strftime("%d")))
 
     
-    mn = str(round(float(balance)-((int(dn))*daily_count),2))
+    mn = round(float(balance)-((int(dn))*daily_count),2)
 
 
     ind1 = '🟢' if float(sald) >= 0 else '🔴'
@@ -236,19 +236,19 @@ def main_menu(bot, path, memory, id):
         sta = 'дефицит'
         ind5 = '🔴'
 
-    message_ = """
+    message_ = f"""
 📆 Дневная сводка
-*{}*
+*{nowf}*
 
-{} Сальдо: *{}*₽
-{} Дневной остаток: *{}*₽
+{ind1} Сальдо: *{sald}*₽
+{ind2} Дневной остаток: *{ost}*₽
 
-До конца периода: *{}* дней(я)
+До конца периода: *{dn}* дней(я)
 
-{} Баланс: *{}*₽
-{} Свободных средств: *{}*₽
-{} Статус: {}.
-    """.format(nowf, ind1, sald, ind2, ost, dn, ind3, balance, ind4, mn, ind5, sta)
+{ind3} Баланс: *{balance}*₽
+{ind4} Свободных средств: *{mn}*₽
+{ind5} Статус: {sta}.
+    """
     
     bot.send_message(id, text=message_, reply_markup=memory.keyboards["keyboard_main"], parse_mode='markdown')
     pass
