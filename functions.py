@@ -8,7 +8,6 @@ import csv
 import os
 
 def log(text):
-    
     if text != "" and text != " ":
         
         today_date = datetime.datetime.now().strftime('%Y-%m-%d')
@@ -117,8 +116,12 @@ def create_profile(path, object):
     if not("categories" in inf):
         d_cat = load_data(path.path_default_category)
         inf["categories"] = d_cat["categories"]
-    if not("balance" in inf):
-        inf["balance"] = 0
+    #if not("balance" in inf):
+    #    inf["balance"] = 0
+    if not("bills" in inf):
+        bills = {}
+        bills["main"] = 0
+        inf["bills"] = bills    
     if not("operations" in inf):
         inf["operations"] = {}
 
@@ -183,6 +186,16 @@ def statistic_seven_day(bot, path, memory, id):
 
         log(f"Operation 'statistic_seven_day', user: {id} was not executed!")
 
+def get_bills(path, id):
+    information = load_data(path.path_json + "/" + str(id) + ".json")
+    bills = information["bills"]
+
+    message = ""
+    for bill, value in bills.items():
+        message += f"""
+{bill.replace("main", "Платежный")} : {value}
+"""
+    return message
 
 def main_menu(bot, path, memory, id):
     #texts = "Главное меню: "

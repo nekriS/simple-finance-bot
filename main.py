@@ -1,6 +1,6 @@
 from data import load_data, save_data
 from login import get_login
-from functions import create_buts_cat, add_operation, create_profile, statistic_seven_day, main_menu, settings, log, get_csv_month
+from functions import create_buts_cat, add_operation, create_profile, statistic_seven_day, main_menu, settings, log, get_csv_month, get_bills
 import warnings
 import sys
 import os
@@ -40,6 +40,10 @@ def callback_worker(call):
             settings(bot, path, memory, call.message.chat.id)
         case "len_period":
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="❓️ Выберите длину расчетного периода:", reply_markup=memory.keyboards["keyboard_len"])  
+        case "bills":
+
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=get_bills(path, call.from_user.id), reply_markup=memory.keyboards["keyboard_bills"]) 
+        
         case "week":
             users = load_data(path.path_users)
             users[str(call.message.chat.id)]["days"] = "week"
@@ -169,6 +173,17 @@ def init():
     keyboard_main.add(key_help)
 
     memory.keyboards["keyboard_main"] = keyboard_main
+
+    # меню счетовы
+    keyboard_bills = types.InlineKeyboardMarkup()
+    add_bill = types.InlineKeyboardButton(text='📄 Добавить счет', callback_data='add_bill')
+    del_bill = types.InlineKeyboardButton(text='📄 Удалить счет', callback_data='del_bill')
+    back = types.InlineKeyboardButton(text='👈 Назад', callback_data='back')
+    keyboard_bills.add(add_bill)
+    keyboard_bills.add(del_bill)
+    keyboard_bills.add(back)
+
+    memory.keyboards["keyboard_bills"] = keyboard_bills
 
     # меню экспорта
     keyboard_export = types.InlineKeyboardMarkup()
