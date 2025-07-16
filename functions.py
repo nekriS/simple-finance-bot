@@ -162,13 +162,14 @@ def statistic_seven_day(bot, path, memory, id):
         message = f"""
 📈 *Статистика за последние 7 дней*
 
-{days[6]} {("🟢" if values[6] > 0 else "🔴") * int(abs(values[6]) // part)} {"+" if values[5] > 0 else ""}{values[6]}{profile["currecy"]}
+{days[6]} {("🟢" if values[6] > 0 else "🔴") * int(abs(values[6]) // part)} {"+" if values[6] > 0 else ""}{values[6]}{profile["currecy"]}
 {days[5]} {("🟢" if values[5] > 0 else "🔴") * int(abs(values[5]) // part)} {"+" if values[5] > 0 else ""}{values[5]}{profile["currecy"]}
 {days[4]} {("🟢" if values[4] > 0 else "🔴") * int(abs(values[4]) // part)} {"+" if values[4] > 0 else ""}{values[4]}{profile["currecy"]}
 {days[3]} {("🟢" if values[3] > 0 else "🔴") * int(abs(values[3]) // part)} {"+" if values[3] > 0 else ""}{values[3]}{profile["currecy"]}
 {days[2]} {("🟢" if values[2] > 0 else "🔴") * int(abs(values[2]) // part)} {"+" if values[2] > 0 else ""}{values[2]}{profile["currecy"]}
 {days[1]} {("🟢" if values[1] > 0 else "🔴") * int(abs(values[1]) // part)} {"+" if values[1] > 0 else ""}{values[1]}{profile["currecy"]}
 {days[0]} {("🟢" if values[0] > 0 else "🔴") * int(abs(values[0]) // part)} {"+" if values[0] > 0 else ""}{values[0]}{profile["currecy"]}
+
 
 Всего: *{round(np.sum(values), 2)}*{profile["currecy"]}
 Среднее: *{round(np.mean(values), 2)}*{profile["currecy"]} 
