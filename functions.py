@@ -60,6 +60,7 @@ def add_operation(path, memory, id, num, cat):
 
     now = datetime.datetime.now(tz=memory.timezone)  
     nowf = now.strftime("%d.%m.%Y")
+    time = now.strftime("%H:%M:%S")
 
     if not(nowf in information["operations"]):
         information["operations"][nowf] = []
@@ -78,7 +79,7 @@ def add_operation(path, memory, id, num, cat):
     #     log(f"Couldn't get the category! id: {id}, cat_id: {cat}")
     #     pass
     
-    information["operations"][nowf].append([num, cat])
+    information["operations"][nowf].append([num, cat, time])
 
     save_data(information, path.path_json + "/" + str(id) + ".json")
 
@@ -301,6 +302,13 @@ def get_category(user, operation):
     
     return ""
 
+def get_time(operation):
+    if len(operation) > 2:
+        return operation[2]
+    else:
+        return 0
+
+
 
 def get_csv_month(bot, path, memory, id):
 
@@ -319,7 +327,7 @@ def get_csv_month(bot, path, memory, id):
             for operation in user["operations"][date_formate]:
 
                 #table.append([date.strftime("%d.%m.%Y") , round(get_day_saldo(user["operations"][date_formate]), 2)])
-                table.append([date.strftime("%d.%m.%Y") , round(operation[0]), get_category(user, operation) ])  
+                table.append([date.strftime("%d.%m.%Y") , get_time(operation) , round(operation[0]), get_category(user, operation) ])  
 
     print(table)
     with open(f'data/month_{id}.csv', 'w', newline='', encoding='utf-8-sig') as file:
