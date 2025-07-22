@@ -1,135 +1,185 @@
-
-from data import load_data, save_data
-import calendar
-import numpy as np
-from telebot import types
 import datetime
+import system as st
+import numpy as np
+import inspect
+import calendar
+from telebot import types
+import time
 import csv
-import os
 
-def log(text):
-    if text != "" and text != " ":
+DEFAULT_USER = {
+    "properties": {
+        "id": "#id",
+        "first_name": "#first_name",
+        "last_name": "#last_name",
+        "username": "#username",
+        "is_premium": "#is_premium",
+        "is_pay": False,
+        "days": "month",
+        "days_limit": 650,
+        "currecy": "\u20bd",
+        "timezone": 3 
+    },
+    "categories": {
+        "expenses": [
+            "🔄 Перевод себе",
+			"💸 Переводы людям",
+			"🔌 ЖКХ, связь, интернет",
+			"🛒 Супермаркеты",
+			"📦 Маркетплейсы",
+			"💊 Медицина",
+			"🚇 Транспорт",
+			"🍽️ Кафе, рестораны",
+			"🧩 Прочее"
+		],
+		"income": [
+            "🔄 Перевод себе",
+			"👔 Зарплата",
+			"📈 Капитализация",
+			"🎁 Переводы от людей",
+			"🔁 Возврат",
+			"🧩 Прочее"
+		]
+    },
+    "bills": {
+        "main": ["Основной", 0, "💵"]
+    },
+    "operations": {}
+}
+
+def get_category(user, operation):
+    try:
+        if operation[0] > 0:
+            return user["categories"]["income"][operation[1]]
+        elif operation[0] < 0:
+            return user["categories"]["expenses"][operation[1]]
+    except:
+        st.log("ERROR with category!")
+    
+    return ""
+
+def get_csv_month(id):
+
+    table = [["operation", "category", "time", "from", "to", "date"]]
+    user = st.load_data(f"data/{id}.json")
+
+    now = datetime.datetime.now(tz=datetime.timezone(datetime.timedelta(hours=int(user["properties"]["timezone"]))))   
+
+    for day in range (0, 30):
+        date = now - datetime.timedelta(days=day)
+        date_formate = date.strftime("%d.%m.%Y")
         
-        today_date = datetime.datetime.now().strftime('%Y-%m-%d')
-        log_directory = 'log'
-        log_file_name = f'log_{today_date}.txt'
-        log_file_path = os.path.join(log_directory, log_file_name)
+        if date_formate in user["operations"]:
+            for operation in user["operations"][date_formate]:
+                operation[1] = get_category(user, operation)
+                operation.append(date_formate)
+                table.append(operation)
 
-        # Проверяем наличие каталога "log" и создаем его, если его нет
-        if not os.path.exists(log_directory):
-            os.makedirs(log_directory)
 
-        # Формируем строку для записи: "дата-время > текст"
-        current_time = datetime.datetime.now().strftime('%H:%M:%S')
-        log_entry = f"{today_date} {current_time} > {text}"
+    with open(f'data/month_{now.strftime("%d%m")}_{id}.csv', 'w', newline='', encoding='utf-8-sig') as file:
+        writer = csv.writer(file)
+        writer.writerows(table)
+    
+    time.sleep(5)
+    reply_message = "✅️ Файл сформирован!"
 
-        # Проверяем existence файла и записываем данные
-        with open(log_file_path, 'a', encoding='utf-8') as file:
-            file.write(log_entry+"\n")
+    return reply_message, f'data/month_{now.strftime("%d%m")}_{id}.csv'
+    
+    
 
-        print(log_entry)
+def get_bill_list(id):
+    user = st.load_data(f"data/{id}.json")
+    bills = user["bills"]
 
-def create_buts_cat(path, id, operation):
-    keyboard_cat = types.InlineKeyboardMarkup();
-    information = load_data(path.path_json + "/" + str(id) + ".json")
+    reply_message = """
+*Список счетов:*
+"""
+    for bill, value in bills.items():
+        reply_message += f"""
+{value[2]} {value[0]} : {round(value[1], 2)}{user["properties"]["currecy"]}
+"""
+    return reply_message
+
+def add_operation(id, value, category, bill=-1):
+
+    user = st.load_data(f"data/{id}.json")
+    
+
+    now = datetime.datetime.now(tz=datetime.timezone(datetime.timedelta(hours=int(user["properties"]["timezone"]))))  
+    nowf = now.strftime("%d.%m.%Y")
+    time = now.strftime("%H:%M:%S")
+
+    if not(nowf in user["operations"]):
+        user["operations"][nowf] = []
+    
+    if bill == -1:
+        user["bills"]["main"][1] = user["bills"]["main"][1] + value
+        if value > 0:
+            bill_to = "main"
+            bill_from = ""
+            user["operations"][nowf].append([value, category, time, bill_from, bill_to])
+        else:
+            bill_to = ""
+            bill_from = "main"
+            user["operations"][nowf].append([value, category, time, bill_from, bill_to])
+    else:
+        user["bills"]["main"][1] = user["bills"]["main"][1] + value
+        bills_ = list(user["bills"].keys())
+        user["bills"][bills_[bill]][1] = user["bills"][bills_[bill]][1] - value
+        if value > 0:
+            bill_to = "main"
+            bill_from = bills_[bill]
+            user["operations"][nowf].append([value, category, time, bill_from, bill_to])
+        else:
+            bill_to = bills_[bill]
+            bill_from = "main"
+            user["operations"][nowf].append([value, category, time, bill_from, bill_to])
+
+    st.save_data(user, f"data/{id}.json")
+    st.log(f"Operation was added: {value}, id: {id}, cat_id: {category}")
+
+    reply_message = """✅️ Операция успешно добавлена!
+"""
+    return reply_message
+
+def get_buttons_with_bills(id):
+
+    keyboard_bills = types.InlineKeyboardMarkup()
+    user = st.load_data(f"data/{id}.json")
+    bills = user["bills"]
+    i = 0
+    for bill in bills.keys():
+        name_bill = bills[bill][0]
+        value_bill = bills[bill][1]
+        icon_bill = bills[bill][2]
+        bill_button = types.InlineKeyboardButton(text=f"{icon_bill} {name_bill} ({value_bill}{user["properties"]["currecy"]})", callback_data="bill_"+str(i));
+        keyboard_bills.add(bill_button)
+        i += 1
+
+    return keyboard_bills
+
+def get_buttons_with_categories(id, operation):
+    keyboard_cat = types.InlineKeyboardMarkup()
+    user = st.load_data(f"data/{id}.json")
 
     i = 0
     cat_0 = types.InlineKeyboardButton(text="def", callback_data="def");
     
     if operation < 0:
-        cats = information["categories"]["expenses"]
+        cats = user["categories"]["expenses"]
     elif operation > 0:
-        cats = information["categories"]["income"]
-
+        cats = user["categories"]["income"]
 
     for cat in cats:
         cat_1 = cat_0
-        cat_0 = types.InlineKeyboardButton(text=cat, callback_data="cat_"+str(i));
+        cat_0 = types.InlineKeyboardButton(text=cat, callback_data="cat_"+str(i))
         if ((i + 1) % 2) == 0:
-            keyboard_cat.row(cat_0, cat_1);
+            keyboard_cat.row(cat_1, cat_0)
         elif (i + 1) == len(cats):
-            keyboard_cat.add(cat_0);
-        #keyboard_cat.add(cat_0);
+            keyboard_cat.add(cat_0)
         i += 1 
+
     return keyboard_cat
-
-def add_operation(path, memory, id, num, cat):
-
-    information = load_data(path.path_json + "/" + str(id) + ".json")
-    information["balance"] = information["balance"] + num
-
-    now = datetime.datetime.now(tz=memory.timezone)  
-    nowf = now.strftime("%d.%m.%Y")
-    time = now.strftime("%H:%M:%S")
-
-    if not(nowf in information["operations"]):
-        information["operations"][nowf] = []
-
-
-    # cat_str = "None"
-
-    # try:
-    #     if num < 0:
-    #         cat_str = information["categories"]["expenses"][cat]
-    #     elif num > 0:
-    #         cat_str = information["categories"]["income"][cat]
-    #     else:
-    #         pass
-    # except:
-    #     log(f"Couldn't get the category! id: {id}, cat_id: {cat}")
-    #     pass
-    
-    information["operations"][nowf].append([num, cat, time])
-
-    save_data(information, path.path_json + "/" + str(id) + ".json")
-
-    log(f"Operation was added: {num}, id: {id}, cat_id: {cat}")
-
-    pass
-
-def create_profile(path, object):
-    #загружаем бд с данными пользователей
-    users = load_data(path.path_users)
-    result = True
-
-    if not(str(object.id) in users):
-        users[str(object.id)] = {}
-        users[str(object.id)]["id"] = object.id
-        users[str(object.id)]["first_name"] = object.first_name
-        users[str(object.id)]["last_name"] = object.last_name
-        users[str(object.id)]["username"] = object.username
-        users[str(object.id)]["is_premium"] = bool(object.is_premium)
-    else:
-        result = False
-
-    if not("is_pay" in users[str(object.id)]):
-        users[str(object.id)]["is_pay"] = False #для примера, потом убрать, иначе будет стирать историю покупок подписки
-    #users[str(object.id)] = tmp
-    if not("days" in users[str(object.id)]):
-        users[str(object.id)]["days"] = "month"
-    if not("days_limit" in users[str(object.id)]):
-        users[str(object.id)]["days_limit"] = 500
-    if not("currecy" in users[str(object.id)]):
-        users[str(object.id)]["currecy"] = "₽"
-
-    #загружаем бд с данными конкретного пользователя
-    inf = load_data(path.path_json + "/" + str(object.id) + ".json")
-    if not("categories" in inf):
-        d_cat = load_data(path.path_default_category)
-        inf["categories"] = d_cat["categories"]
-    #if not("balance" in inf):
-    #    inf["balance"] = 0
-    if not("bills" in inf):
-        bills = {}
-        bills["main"] = 0
-        inf["bills"] = bills    
-    if not("operations" in inf):
-        inf["operations"] = {}
-
-    save_data(inf, path.path_json + "/" + str(object.id) + ".json")
-    save_data(users, path.path_users)
-
-    return result
 
 def get_day_saldo(day_operations):
     summa = 0
@@ -137,16 +187,86 @@ def get_day_saldo(day_operations):
         summa += operation[0]
     return summa
 
-def statistic_seven_day(bot, path, memory, id):
+def get_day_status(id):
+    try:
+
+        user = st.load_data(f"data/{id}.json")
+        profile = user["properties"]
+        now = datetime.datetime.now(tz=datetime.timezone(datetime.timedelta(hours=int(user["properties"]["timezone"]))))  
+        nowf = now.strftime("%d.%m.%Y")
+
+        balance = round((user["bills"]["main"][1]), 2)
+
+        sum = 0.0
+        if nowf in user["operations"]:
+            for el in user["operations"][nowf]:
+                sum += float(el[0])
+        sald = round(sum,2)
+
+        minn = 0.0
+        if nowf in user["operations"]:
+            for el in user["operations"][nowf]:
+                if el[0] < 0:
+                    minn += float(el[0])
+        
+
+        daily_count = float(profile["days_limit"]) 
+        ost = round(daily_count + minn,2)
+
+
+        if profile["days"] == 'week':
+            dayss = 7
+            #print(now.weekday())
+            dn = str(dayss - int(now.weekday()))
+        else:
+            dayss = calendar.monthrange(2021, int(now.strftime("%m")))[1]
+            dn = str(dayss+1 - int(now.strftime("%d")))
+
+        
+        mn = round(float(balance)-((int(dn))*daily_count),2)
+
+
+        ind1 = '🟢' if float(sald) >= 0 else '🔴'
+        ind2 = '🟢' if float(ost) >= 0 else '🔴'
+        ind3 = '🟢' if float(balance) >= 0 else '🔴'
+        ind4 = '🟢' if float(mn) >= 0 else '🔴'
+
+
+        if float(mn) >= 0:
+            sta = 'профицит'
+            ind5 = '🟢'
+        else:
+            sta = 'дефицит'
+            ind5 = '🔴'
+
+        reply_message = f"""
+📆 Дневная сводка
+*{nowf}*
+
+{ind1} Сальдо: *{sald}*₽
+{ind2} Дневной остаток: *{ost}*₽
+
+До конца периода: *{dn}* дней(я)
+
+{ind3} Баланс: *{balance}*₽
+{ind4} Свободных средств: *{mn}*₽
+{ind5} Статус: {sta}.
+    """
+
+        st.log(f"Operation '{inspect.currentframe().f_code.co_name}', user: {id} completed successfully!")
+        return reply_message
+    except:
+        st.log(f"Operation '{inspect.currentframe().f_code.co_name}', user: {id} was not executed!")
+        return "❌ Ошибка"
+
+def get_statistic_seven_day(id):
     try:
         values = []
         days = []
         
-        user = load_data(path.path_json + "/" + str(id) + ".json")
-        users = load_data(path.path_users)
-        profile = users[str(id)]
-
-        now = datetime.datetime.now(tz=memory.timezone)  
+        user = st.load_data(f"data/{id}.json")
+        profile = user["properties"]
+        now = datetime.datetime.now(tz=datetime.timezone(datetime.timedelta(hours=int(user["properties"]["timezone"]))))  
 
         for day in range(0, 7):
             date = now - datetime.timedelta(days=day)
@@ -161,9 +281,7 @@ def statistic_seven_day(bot, path, memory, id):
 
         part = (np.max(values) - 0.01) / 7
 
-        
-
-        message = f"""
+        reply_message = f"""
 📈 *Статистика за последние 7 дней*
 
 {days[6]} {("🟢" if values[6] > 0 else "🔴") * int(abs(values[6]) // part)} {"+" if values[6] > 0 else ""}{values[6]}{profile["currecy"]}
@@ -174,111 +292,52 @@ def statistic_seven_day(bot, path, memory, id):
 {days[1]} {("🟢" if values[1] > 0 else "🔴") * int(abs(values[1]) // part)} {"+" if values[1] > 0 else ""}{values[1]}{profile["currecy"]}
 {days[0]} {("🟢" if values[0] > 0 else "🔴") * int(abs(values[0]) // part)} {"+" if values[0] > 0 else ""}{values[0]}{profile["currecy"]}
 
-
 Всего: *{round(np.sum(values), 2)}*{profile["currecy"]}
 Среднее: *{round(np.mean(values), 2)}*{profile["currecy"]} 
 """.replace("-", "−").replace("  ", " ")
 
-        bot.send_message(id, text=message, reply_markup=memory.keyboards["keyboard_main"], parse_mode='markdown')
-    
-        log(f"Operation 'statistic_seven_day', user: {id} completed successfully!")
-
+        st.log(f"Operation '{inspect.currentframe().f_code.co_name}', user: {id} completed successfully!")
+        return reply_message
     except:
+        st.log(f"Operation '{inspect.currentframe().f_code.co_name}', user: {id} was not executed!")
+        return "❌ Ошибка"
 
-        log(f"Operation 'statistic_seven_day', user: {id} was not executed!")
+def get_start(object):
+    try:
+        user = st.load_data(f"data/{object.id}.json")
 
-def get_bills(path, id):
-    information = load_data(path.path_json + "/" + str(id) + ".json")
-    bills = information["bills"]
+        for pole in DEFAULT_USER.keys():
+            if not(pole in user):
+                user[pole] = DEFAULT_USER[pole]
 
-    message = ""
-    for bill, value in bills.items():
-        message += f"""
-{bill.replace("main", "Платежный")} : {value}
-"""
-    return message
+        for pole in DEFAULT_USER["properties"].keys():
+            if not(pole in user["properties"]):
+                user["properties"][pole] = DEFAULT_USER["properties"][pole]
+        
+        user["properties"]["id"] = object.id
+        user["properties"]["first_name"] = object.first_name
+        user["properties"]["last_name"] = object.last_name
+        user["properties"]["username"] = object.username
+        user["properties"]["is_premium"] = bool(object.is_premium)
 
-def main_menu(bot, path, memory, id):
-    #texts = "Главное меню: "
+        st.save_data(user, f"data/{object.id}.json")
+        st.log(f"Profile was created! id: {object.id}")
 
-    users = load_data(path.path_users)
-    user = load_data(path.path_json + "/" + str(id) + ".json")
-
-    now = datetime.datetime.now(tz=memory.timezone)  
-    nowf = now.strftime("%d.%m.%Y")
-
-    balance = round((user["balance"]),2)
-
-    sum = 0.0
-    if nowf in user["operations"]:
-        for el in user["operations"][nowf]:
-            sum += float(el[0])
-    sald = round(sum,2)
-
-    minn = 0.0
-    if nowf in user["operations"]:
-        for el in user["operations"][nowf]:
-            if el[0] < 0:
-                minn += float(el[0])
+        return "✅️ Ваш профиль был успешно создан!"
+    except:
+        st.log(f"Can't create profile! id: {object.id}")
+        return "❌ Ошибка при создании профиля!"
     
+def get_settings(id):
 
-    daily_count = float(users[str(id)]["days_limit"]) 
-    ost = round(daily_count + minn,2)
+    user = st.load_data(f"data/{id}.json")
 
-
-    if users[str(id)]["days"] == 'week':
-        dayss = 7
-        #print(now.weekday())
-        dn = str(dayss - int(now.weekday()))
-    else:
-        dayss = calendar.monthrange(2021, int(now.strftime("%m")))[1]
-        dn = str(dayss+1 - int(now.strftime("%d")))
-
-    
-    mn = round(float(balance)-((int(dn))*daily_count),2)
-
-
-    ind1 = '🟢' if float(sald) >= 0 else '🔴'
-    ind2 = '🟢' if float(ost) >= 0 else '🔴'
-    ind3 = '🟢' if float(balance) >= 0 else '🔴'
-    ind4 = '🟢' if float(mn) >= 0 else '🔴'
-
-
-    if float(mn) >= 0:
-        sta = 'профицит'
-        ind5 = '🔴'
-    else:
-        sta = 'дефицит'
-        ind5 = '🔴'
-
-    message_ = f"""
-📆 Дневная сводка
-*{nowf}*
-
-{ind1} Сальдо: *{sald}*₽
-{ind2} Дневной остаток: *{ost}*₽
-
-До конца периода: *{dn}* дней(я)
-
-{ind3} Баланс: *{balance}*₽
-{ind4} Свободных средств: *{mn}*₽
-{ind5} Статус: {sta}.
-    """
-    
-    bot.send_message(id, text=message_, reply_markup=memory.keyboards["keyboard_main"], parse_mode='markdown')
-    pass
-
-def settings(bot, path, memory, id):
-
-    users = load_data(path.path_users)
-
-    days = users[str(id)]["days"]
-    limit = users[str(id)]["days_limit"]
-    currency = users[str(id)]["currecy"]
-
+    days = user["properties"]["days"]
+    limit = user["properties"]["days_limit"]
+    currency = user["properties"]["currecy"]
     days = days.replace("month", "месяц").replace("week", "неделя")
 
-    texts = f"""
+    reply_message = f"""
 ⚙ *Настройки*
 
 Расчетный период: *{days}*
@@ -286,60 +345,8 @@ def settings(bot, path, memory, id):
 Валюта: *{currency}*
 
 """
+    return reply_message
     
-    bot.send_message(id, text=texts, reply_markup=memory.keyboards["keyboard_setting"], parse_mode='markdown')
-
-import time
-
-def get_category(user, operation):
-    try:
-        if operation[0] > 0:
-            return user["categories"]["income"][operation[1]]
-        elif operation[0] < 0:
-            return user["categories"]["expenses"][operation[1]]
-    except:
-        log("ERROR with category!")
     
-    return ""
 
-def get_time(operation):
-    if len(operation) > 2:
-        return operation[2]
-    else:
-        return 0
-
-
-
-def get_csv_month(bot, path, memory, id):
-
-    bot.send_message(id, text="Формируем файл CSV...")
-
-    table = [["date", "operation", "category"]]
-    user = load_data(path.path_json + "/" + str(id) + ".json")
-
-    now = datetime.datetime.now(tz=memory.timezone)  
-
-    for day in range (0, 30):
-        date = now - datetime.timedelta(days=day)
-        date_formate = date.strftime("%d.%m.%Y")
-        
-        if date_formate in user["operations"]:
-            for operation in user["operations"][date_formate]:
-
-                #table.append([date.strftime("%d.%m.%Y") , round(get_day_saldo(user["operations"][date_formate]), 2)])
-                table.append([date.strftime("%d.%m.%Y") , get_time(operation) , round(operation[0]), get_category(user, operation) ])  
-
-    print(table)
-    with open(f'data/month_{now.strftime("%d%m")}_{id}.csv', 'w', newline='', encoding='utf-8-sig') as file:
-        writer = csv.writer(file)
-        writer.writerows(table)
-    
-    time.sleep(5)
-
-    bot.send_document(id, document=open(f'data/month_{now.strftime("%d%m")}_{id}.csv', 'rb'), caption="✅️ Файл сформирован!")
-
-    os.remove(f'data/month_{now.strftime("%d%m")}_{id}.csv')
-    
-    main_menu(bot, path, memory, id)
-
-    
+#getattr(person, attr_name)
