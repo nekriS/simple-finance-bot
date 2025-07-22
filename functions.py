@@ -290,11 +290,23 @@ def settings(bot, path, memory, id):
 
 import time
 
+def get_category(user, operation):
+    try:
+        if operation[0] > 0:
+            return user["categories"]["income"][operation[1]]
+        elif operation[0] < 0:
+            return user["categories"]["expenses"][operation[1]]
+    except:
+        log("ERROR with category!")
+    
+    return ""
+
+
 def get_csv_month(bot, path, memory, id):
 
     bot.send_message(id, text="Формируем файл CSV...")
 
-    table = [["date", "balance"]]
+    table = [["date", "operation", "category"]]
     user = load_data(path.path_json + "/" + str(id) + ".json")
 
     now = datetime.datetime.now(tz=memory.timezone)  
@@ -304,10 +316,13 @@ def get_csv_month(bot, path, memory, id):
         date_formate = date.strftime("%d.%m.%Y")
         
         if date_formate in user["operations"]:
-            table.append([date.strftime("%d.%m") , round(get_day_saldo(user["operations"][date_formate]), 2)])  
+            for operation in user["operations"][date_formate]:
+
+                #table.append([date.strftime("%d.%m.%Y") , round(get_day_saldo(user["operations"][date_formate]), 2)])
+                table.append([date.strftime("%d.%m.%Y") , round(operation[0]), get_category(user, operation) ])  
 
     print(table)
-    with open(f'data/month_{id}.csv', 'w', newline='') as file:
+    with open(f'data/month_{id}.csv', 'w', newline='', encoding='utf-8-sig') as file:
         writer = csv.writer(file)
         writer.writerows(table)
     
