@@ -330,15 +330,15 @@ def get_csv_month(bot, path, memory, id):
                 table.append([date.strftime("%d.%m.%Y") , get_time(operation) , round(operation[0]), get_category(user, operation) ])  
 
     print(table)
-    with open(f'data/month_{id}.csv', 'w', newline='', encoding='utf-8-sig') as file:
+    with open(f'data/month_{now.strftime("%d%m")}_{id}.csv', 'w', newline='', encoding='utf-8-sig') as file:
         writer = csv.writer(file)
         writer.writerows(table)
     
     time.sleep(5)
 
-    bot.send_document(id, document=open(f'data/month_{id}.csv', 'rb'), caption="✅️ Файл сформирован!")
+    bot.send_document(id, document=open(f'data/month_{now.strftime("%d%m")}_{id}.csv', 'rb'), caption="✅️ Файл сформирован!")
 
-    os.remove(f'data/month_{id}.csv')
+    os.remove(f'data/month_{now.strftime("%d%m")}_{id}.csv')
     
     main_menu(bot, path, memory, id)
 
