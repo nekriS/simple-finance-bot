@@ -104,7 +104,6 @@ def add_operation(id, value, category, bill=-1):
 
     user = st.load_data(f"data/{id}.json")
     
-
     now = datetime.datetime.now(tz=datetime.timezone(datetime.timedelta(hours=int(user["properties"]["timezone"]))))  
     nowf = now.strftime("%d.%m.%Y")
     time = now.strftime("%H:%M:%S")
@@ -118,10 +117,12 @@ def add_operation(id, value, category, bill=-1):
             bill_to = "main"
             bill_from = ""
             user["operations"][nowf].append([value, category, time, bill_from, bill_to])
+            cat_str = user["categories"]["income"][category]
         else:
             bill_to = ""
             bill_from = "main"
             user["operations"][nowf].append([value, category, time, bill_from, bill_to])
+            cat_str = user["categories"]["expenses"][category]
     else:
         user["bills"]["main"][1] = user["bills"]["main"][1] + value
         bills_ = list(user["bills"].keys())
@@ -130,15 +131,19 @@ def add_operation(id, value, category, bill=-1):
             bill_to = "main"
             bill_from = bills_[bill]
             user["operations"][nowf].append([value, category, time, bill_from, bill_to])
+            cat_str = user["categories"]["income"][category]
         else:
             bill_to = bills_[bill]
             bill_from = "main"
             user["operations"][nowf].append([value, category, time, bill_from, bill_to])
+            cat_str = user["categories"]["expenses"][category]
 
     st.save_data(user, f"data/{id}.json")
     st.log(f"Operation was added: {value}, id: {id}, cat_id: {category}")
 
-    reply_message = """✅️ Операция успешно добавлена!
+    reply_message = f"""✅️ Операция успешно добавлена!
+Категория: {cat_str}
+Остаток: {user["bills"]["main"][1]}{user["properties"]["currecy"]}
 """
     return reply_message
 
