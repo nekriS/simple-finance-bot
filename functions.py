@@ -84,19 +84,26 @@ def get_csv_month(id):
     reply_message = "✅️ Файл сформирован!"
 
     return reply_message, f'data/month_{now.strftime("%d%m")}_{id}.csv'
-    
-    
+
+def get_all_balance(bills):
+    balance = 0
+    for bill, value in bills.items():
+        balance += value[1]
+    return balance
+
 
 def get_bill_list(id):
     user = st.load_data(f"data/{id}.json")
     bills = user["bills"]
 
-    reply_message = """
-*Список счетов:*
-"""
+    bills_list = ""
     for bill, value in bills.items():
-        reply_message += f"""
-{value[2]} {value[0]} : {round(value[1], 2)}{user["properties"]["currecy"]}
+        bills_list += f"""
+{value[2]} {value[0]} : {round(value[1], 2)}{user["properties"]["currecy"]}"""
+    reply_message = f"""*Список счетов:*
+{bills_list}
+
+Общий баланс: *{get_all_balance(bills)}*{user["properties"]["currecy"]}
 """
     return reply_message
 
@@ -107,6 +114,12 @@ def add_operation(id, value, category, bill=-1):
     now = datetime.datetime.now(tz=datetime.timezone(datetime.timedelta(hours=int(user["properties"]["timezone"]))))  
     nowf = now.strftime("%d.%m.%Y")
     time = now.strftime("%H:%M:%S")
+    type_operation = 0
+
+    # 0 - no operation
+    # 1 - earnings
+    # 2 - expenses
+    # 3 - transfer
 
     if not(nowf in user["operations"]):
         user["operations"][nowf] = []
@@ -116,12 +129,14 @@ def add_operation(id, value, category, bill=-1):
         if value > 0:
             bill_to = "main"
             bill_from = ""
-            user["operations"][nowf].append([value, category, time, bill_from, bill_to])
+            type_operation = 1
+            user["operations"][nowf].append([time, type_operation, value, category, bill_from, bill_to])
             cat_str = user["categories"]["income"][category]
         else:
             bill_to = ""
             bill_from = "main"
-            user["operations"][nowf].append([value, category, time, bill_from, bill_to])
+            type_operation = 2
+            user["operations"][nowf].append([time, type_operation, value, category, bill_from, bill_to])
             cat_str = user["categories"]["expenses"][category]
     else:
         user["bills"]["main"][1] = user["bills"]["main"][1] + value
@@ -130,12 +145,14 @@ def add_operation(id, value, category, bill=-1):
         if value > 0:
             bill_to = "main"
             bill_from = bills_[bill]
-            user["operations"][nowf].append([value, category, time, bill_from, bill_to])
+            type_operation = 3
+            user["operations"][nowf].append([time, type_operation, value, category, bill_from, bill_to])
             cat_str = user["categories"]["income"][category]
         else:
             bill_to = bills_[bill]
             bill_from = "main"
-            user["operations"][nowf].append([value, category, time, bill_from, bill_to])
+            type_operation = 3
+            user["operations"][nowf].append([time, type_operation, value, category, bill_from, bill_to])
             cat_str = user["categories"]["expenses"][category]
 
     st.save_data(user, f"data/{id}.json")
@@ -189,7 +206,7 @@ def get_buttons_with_categories(id, operation):
 def get_day_saldo(day_operations):
     summa = 0
     for operation in day_operations:
-        summa += operation[0]
+        summa += operation[2]
     return summa
 
 def get_day_status(id):
@@ -205,14 +222,14 @@ def get_day_status(id):
         sum = 0.0
         if nowf in user["operations"]:
             for el in user["operations"][nowf]:
-                sum += float(el[0])
+                sum += float(el[2])
         sald = round(sum,2)
 
         minn = 0.0
         if nowf in user["operations"]:
             for el in user["operations"][nowf]:
-                if el[0] < 0:
-                    minn += float(el[0])
+                if (el[2] < 0) and (el[1] < 3):
+                    minn += float(el[2])
         
 
         daily_count = float(profile["days_limit"]) 
