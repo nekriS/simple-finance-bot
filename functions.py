@@ -103,7 +103,7 @@ def get_bill_list(id):
     reply_message = f"""*Список счетов:*
 {bills_list}
 
-Общий баланс: *{get_all_balance(bills)}*{user["properties"]["currecy"]}
+Общий баланс: *{round(get_all_balance(bills),2)}*{user["properties"]["currecy"]}
 """
     return reply_message
 
